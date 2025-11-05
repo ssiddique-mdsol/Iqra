@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iqra - Quran Recitation App</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+                'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 48px;
+        }
+
+        .subtitle {
+            color: #7f8c8d;
+            text-align: center;
+            margin-bottom: 40px;
+            font-size: 18px;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .record-button {
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 20px 40px;
+            border-radius: 30px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: background 0.3s;
+        }
+
+        .record-button:hover {
+            background: #0056b3;
+        }
+
+        .record-button.recording {
+            background: #FF3B30;
+        }
+
+        .record-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .text-box {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #ddd;
+            min-height: 100px;
+            margin-top: 10px;
+        }
+
+        .text-box textarea {
+            width: 100%;
+            min-height: 80px;
+            border: none;
+            background: transparent;
+            font-size: 18px;
+            color: #2c3e50;
+            resize: vertical;
+            font-family: inherit;
+        }
+
+        .loading {
+            text-align: center;
+            color: #7f8c8d;
+            margin-top: 20px;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #007AFF;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .compare-button {
+            background: #27ae60;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .compare-button:hover {
+            background: #229954;
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border: 1px solid #ddd;
+        }
+
+        .match-percentage {
+            font-size: 24px;
+            font-weight: bold;
+            color: #27ae60;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 10px;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #7f8c8d;
+            margin-top: 5px;
+        }
+
+        .word-comparison {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .word {
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+
+        .word-match {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .word-mismatch {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Iqra</h1>
+        <p class="subtitle">Quran Recitation Practice</p>
+
+        <div class="section">
+            <div class="section-title">Audio Recording</div>
+            <button id="recordButton" class="record-button">Start Recording</button>
+            <div id="loading" class="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>Transcribing audio...</p>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Recognized Text</div>
+            <div class="text-box">
+                <div id="transcribedText" style="text-align: center; color: #7f8c8d; padding: 20px;">
+                    Record your recitation to get started
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Verse Text</div>
+            <div class="text-box">
+                <textarea id="verseText" placeholder="Enter verse text here...">بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</textarea>
+            </div>
+        </div>
+
+        <button id="compareButton" class="compare-button" style="display: none;">Compare with Verse</button>
+
+        <div id="result" class="result" style="display: none;">
+            <div class="match-percentage" id="matchPercentage"></div>
+            <div class="stats" id="stats"></div>
+            <div class="word-comparison" id="wordComparison"></div>
+        </div>
+
+        <div id="error" class="error" style="display: none;"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8000';
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+        let recognition = null;
+        let useBrowserSpeech = false;
+
+        // Check if browser speech recognition is available
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = 'ar-SA'; // Arabic (Saudi Arabia) - can change to 'en-US' for English
+            
+            recognition.onresult = (event) => {
+                let interimTranscript = '';
+                let finalTranscript = '';
+                
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalTranscript += transcript + ' ';
+                    } else {
+                        interimTranscript += transcript;
+                    }
+                }
+                
+                if (finalTranscript) {
+                    transcribedText.textContent = finalTranscript.trim();
+                    compareButton.style.display = 'block';
+                } else if (interimTranscript) {
+                    transcribedText.textContent = interimTranscript + ' (listening...)';
+                }
+            };
+            
+            recognition.onerror = (event) => {
+                console.error('Speech recognition error:', event.error);
+                if (event.error === 'not-allowed') {
+                    showError('Microphone permission denied. Please allow microphone access.');
+                } else if (event.error === 'no-speech') {
+                    // Not an error, just no speech detected
+                } else {
+                    showError('Speech recognition error: ' + event.error);
+                }
+            };
+            
+            recognition.onend = () => {
+                if (isRecording) {
+                    // Restart if still recording
+                    try {
+                        recognition.start();
+                    } catch (e) {
+                        // Already started or error
+                    }
+                }
+            };
+            
+            useBrowserSpeech = true;
+            console.log('Browser speech recognition available');
+        } else {
+            console.log('Browser speech recognition not available, using backend API');
+        }
+
+        const recordButton = document.getElementById('recordButton');
+        const compareButton = document.getElementById('compareButton');
+        const transcribedText = document.getElementById('transcribedText');
+        const verseText = document.getElementById('verseText');
+        const loading = document.getElementById('loading');
+        const result = document.getElementById('result');
+        const error = document.getElementById('error');
+
+        recordButton.addEventListener('click', async () => {
+            if (!isRecording) {
+                await startRecording();
+            } else {
+                stopRecording();
+            }
+        });
+
+        async function startRecording() {
+            try {
+                // Clear previous recording data
+                audioChunks = [];
+                
+                // Clear previous transcription and results
+                transcribedText.textContent = useBrowserSpeech ? 'Listening...' : 'Recording...';
+                result.style.display = 'none';
+                compareButton.style.display = 'none';
+                error.style.display = 'none';
+                
+                // Use browser speech recognition if available
+                if (useBrowserSpeech && recognition) {
+                    try {
+                        recognition.start();
+                        isRecording = true;
+                        recordButton.textContent = 'Stop Recording';
+                        recordButton.classList.add('recording');
+                        transcribedText.textContent = 'Listening... Speak now';
+                        return; // Exit early, browser handles transcription
+                    } catch (err) {
+                        console.log('Speech recognition start failed, falling back to MediaRecorder:', err);
+                        // Fall through to MediaRecorder method
+                    }
+                }
+                
+                // Fallback to MediaRecorder + backend API
+                // Stop any existing MediaRecorder
+                if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                    mediaRecorder.stop();
+                    if (mediaRecorder.stream) {
+                        mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                    }
+                }
+                
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                
+                // Reset audio chunks array
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                    }
+                };
+
+                mediaRecorder.onstop = async () => {
+                    // Create blob from fresh audio chunks
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    // Clear previous transcription before processing new one
+                    transcribedText.textContent = 'Processing...';
+                    await transcribeAudio(audioBlob);
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                recordButton.textContent = 'Stop Recording';
+                recordButton.classList.add('recording');
+            } catch (err) {
+                showError('Microphone permission required. Please allow access and try again.');
+                console.error('Error accessing microphone:', err);
+            }
+        }
+
+        function stopRecording() {
+            // Stop browser speech recognition if active
+            if (useBrowserSpeech && recognition && isRecording) {
+                try {
+                    recognition.stop();
+                } catch (e) {
+                    // Already stopped
+                }
+            }
+            
+            // Stop MediaRecorder if active
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                if (mediaRecorder.stream) {
+                    mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                }
+            }
+            
+            isRecording = false;
+            recordButton.textContent = 'Start Recording';
+            recordButton.classList.remove('recording');
+        }
+
+        async function transcribeAudio(audioBlob) {
+            // Verify we have audio data
+            if (!audioBlob || audioBlob.size === 0) {
+                showError('No audio data recorded. Please try again.');
+                transcribedText.textContent = 'No audio recorded';
+                return;
+            }
+            
+            loading.style.display = 'block';
+            error.style.display = 'none';
+            transcribedText.textContent = 'Processing...';
+            result.style.display = 'none'; // Clear previous results
+
+            try {
+                const formData = new FormData();
+                // Use a unique filename with timestamp to avoid caching
+                const timestamp = Date.now();
+                formData.append('audio_file', audioBlob, `recording_${timestamp}.wav`);
+
+                const response = await fetch(`${API_BASE_URL}/transcribe_audio`, {
+                    method: 'POST',
+                    body: formData,
+                    // Prevent caching
+                    cache: 'no-cache'
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.detail || 'Transcription failed');
+                }
+
+                const data = await response.json();
+                
+                // Only update if we got valid text
+                if (data.text && data.text.trim()) {
+                    transcribedText.textContent = data.text;
+                    loading.style.display = 'none';
+                    compareButton.style.display = 'block';
+
+                    // Auto-compare if verse text exists
+                    if (verseText.value.trim()) {
+                        await compareVerse();
+                    }
+                } else {
+                    transcribedText.textContent = 'No text recognized';
+                    loading.style.display = 'none';
+                    showError('No text was recognized from the audio. Please try recording again.');
+                }
+            } catch (err) {
+                loading.style.display = 'none';
+                showError('Failed to transcribe audio: ' + err.message + '. Make sure the backend is running on http://localhost:8000');
+                transcribedText.textContent = 'Error occurred';
+                console.error('Transcription error:', err);
+            }
+        }
+
+        compareButton.addEventListener('click', compareVerse);
+
+        async function compareVerse() {
+            const recognizedText = transcribedText.textContent.trim();
+            const verse = verseText.value.trim();
+
+            if (!recognizedText || recognizedText === 'Record your recitation to get started' || recognizedText === 'Processing...') {
+                showError('Please record audio first');
+                return;
+            }
+
+            if (!verse) {
+                showError('Please enter verse text');
+                return;
+            }
+
+            loading.style.display = 'block';
+            error.style.display = 'none';
+            result.style.display = 'none';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/compare_verse`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        recognized_text: recognizedText,
+                        verse_text: verse,
+                        verse_reference: '1:1'
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Comparison failed');
+                }
+
+                const data = await response.json();
+                displayComparisonResult(data);
+            } catch (err) {
+                loading.style.display = 'none';
+                showError('Failed to compare verse. Make sure the backend is running on http://localhost:8000');
+                console.error('Comparison error:', err);
+            }
+        }
+
+        function displayComparisonResult(data) {
+            loading.style.display = 'none';
+            result.style.display = 'block';
+
+            document.getElementById('matchPercentage').textContent = 
+                `${data.match_percentage.toFixed(1)}% Match`;
+
+            const stats = document.getElementById('stats');
+            stats.innerHTML = `
+                <div class="stat-item">
+                    <div class="stat-value">${data.matched_words}</div>
+                    <div class="stat-label">Matched</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">${data.mismatched_words}</div>
+                    <div class="stat-label">Mismatched</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">${data.total_words}</div>
+                    <div class="stat-label">Total</div>
+                </div>
+            `;
+
+            const wordComparison = document.getElementById('wordComparison');
+            wordComparison.innerHTML = data.word_comparisons.map(item => {
+                const wordClass = item.match ? 'word-match' : 'word-mismatch';
+                return `<span class="word ${wordClass}">${item.recognized || item.verse || '—'}</span>`;
+            }).join('');
+        }
+
+        function showError(message) {
+            error.textContent = message;
+            error.style.display = 'block';
+        }
+
+        // Check backend connection on load
+        fetch(`${API_BASE_URL}/health`)
+            .then(res => res.json())
+            .then(data => console.log('Backend connected:', data))
+            .catch(err => {
+                showError('Backend not reachable. Make sure it\'s running on http://localhost:8000');
+                console.error('Backend connection error:', err);
+            });
+    </script>
+</body>
+</html>
+
