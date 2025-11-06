@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import transcription, comparison
+from app.routes import transcription, comparison, tajweed
 
 app = FastAPI(
     title="Iqra API",
@@ -20,6 +20,7 @@ app.add_middleware(
 # Include routers
 app.include_router(transcription.router, prefix="/transcribe_audio", tags=["transcription"])
 app.include_router(comparison.router, prefix="/compare_verse", tags=["comparison"])
+app.include_router(tajweed.router, prefix="/add_tajweed", tags=["tajweed"])
 
 @app.get("/")
 async def root():

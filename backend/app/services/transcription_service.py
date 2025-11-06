@@ -9,6 +9,9 @@ except ImportError:
     WHISPER_AVAILABLE = False
     whisper = None
 
+# Import tajweed service
+from app.services.tajweed_service import TajweedService
+
 class TranscriptionService:
     """
     Service for transcribing audio to text.
@@ -17,7 +20,9 @@ class TranscriptionService:
     
     def __init__(self):
         self.use_whisper = os.getenv("USE_WHISPER", "false").lower() == "true"
+        self.add_tajweed = os.getenv("ADD_TAJWEED", "true").lower() == "true"
         self.model = None
+        self.tajweed_service = TajweedService()
         
         if self.use_whisper and WHISPER_AVAILABLE:
             try:
@@ -44,9 +49,18 @@ class TranscriptionService:
             Dict with 'text' and optional 'confidence'
         """
         if self.use_whisper and self.model:
-            return await self._transcribe_with_whisper(audio_bytes, filename)
+            result = await self._transcribe_with_whisper(audio_bytes, filename)
         else:
-            return await self._transcribe_mock(audio_bytes, filename)
+            result = await self._transcribe_mock(audio_bytes, filename)
+        
+        # Add tajweed if enabled
+        if self.add_tajweed and result.get("text"):
+            original_text = result["text"]
+            tajweed_text = self.tajweed_service.add_tajweed(original_text)
+            result["text"] = tajweed_text
+            result["original_text"] = original_text  # Keep original for reference
+        
+        return result
     
     async def _transcribe_with_whisper(self, audio_bytes: bytes, filename: str) -> Dict:
         """Transcribe using OpenAI Whisper."""

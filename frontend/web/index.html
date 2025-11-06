@@ -56,6 +56,34 @@
             margin-bottom: 10px;
         }
 
+        .verse-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+
+        .verse-dropdown {
+            flex: 1;
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px solid #ddd;
+            font-size: 16px;
+            background: white;
+            color: #2c3e50;
+            cursor: pointer;
+        }
+
+        .verse-dropdown:hover {
+            border-color: #007AFF;
+        }
+
+        .verse-reference {
+            font-size: 14px;
+            color: #7f8c8d;
+            font-style: italic;
+        }
+
         .record-button {
             background: #007AFF;
             color: white;
@@ -238,9 +266,33 @@
         </div>
 
         <div class="section">
-            <div class="section-title">Verse Text</div>
+            <div class="section-title">Select Verse to Compare</div>
+            <div class="verse-selector">
+                <select id="verseDropdown" class="verse-dropdown">
+                    <option value="">-- Select a verse --</option>
+                    <option value="1:1" data-text="بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ">Al-Fatiha 1:1</option>
+                    <option value="1:2" data-text="الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ">Al-Fatiha 1:2</option>
+                    <option value="1:3" data-text="الرَّحْمَٰنِ الرَّحِيمِ">Al-Fatiha 1:3</option>
+                    <option value="1:4" data-text="مَالِكِ يَوْمِ الدِّينِ">Al-Fatiha 1:4</option>
+                    <option value="1:5" data-text="إِيَّاكَ نَعْبُدُ وَإِيَّاكَ نَسْتَعِينُ">Al-Fatiha 1:5</option>
+                    <option value="1:6" data-text="اهْدِنَا الصِّرَاطَ الْمُسْتَقِيمَ">Al-Fatiha 1:6</option>
+                    <option value="1:7" data-text="صِرَاطَ الَّذِينَ أَنْعَمْتَ عَلَيْهِمْ غَيْرِ الْمَغْضُوبِ عَلَيْهِمْ وَلَا الضَّالِّينَ">Al-Fatiha 1:7</option>
+                    <option value="2:255" data-text="اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ ۚ لَا تَأْخُذُهُ سِنَةٌ وَلَا نَوْمٌ">Al-Baqarah 2:255 (Ayat al-Kursi)</option>
+                    <option value="112:1" data-text="قُلْ هُوَ اللَّهُ أَحَدٌ">Al-Ikhlas 112:1</option>
+                    <option value="112:2" data-text="اللَّهُ الصَّمَدُ">Al-Ikhlas 112:2</option>
+                    <option value="112:3" data-text="لَمْ يَلِدْ وَلَمْ يُولَدْ">Al-Ikhlas 112:3</option>
+                    <option value="112:4" data-text="وَلَمْ يَكُن لَّهُ كُفُوًا أَحَدٌ">Al-Ikhlas 112:4</option>
+                    <option value="113:1" data-text="قُلْ أَعُوذُ بِرَبِّ الْفَلَقِ">Al-Falaq 113:1</option>
+                    <option value="113:2" data-text="مِن شَرِّ مَا خَلَقَ">Al-Falaq 113:2</option>
+                    <option value="114:1" data-text="قُلْ أَعُوذُ بِرَبِّ النَّاسِ">An-Nas 114:1</option>
+                    <option value="114:2" data-text="مَلِكِ النَّاسِ">An-Nas 114:2</option>
+                    <option value="114:3" data-text="إِلَٰهِ النَّاسِ">An-Nas 114:3</option>
+                    <option value="custom" data-text="">Custom Verse (Enter manually)</option>
+                </select>
+            </div>
+            <div class="verse-reference" id="verseReference" style="margin-bottom: 10px;"></div>
             <div class="text-box">
-                <textarea id="verseText" placeholder="Enter verse text here...">بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</textarea>
+                <textarea id="verseText" placeholder="Select a verse from dropdown or enter custom verse text..."></textarea>
             </div>
         </div>
 
@@ -271,7 +323,7 @@
             recognition.interimResults = true;
             recognition.lang = 'ar-SA'; // Arabic (Saudi Arabia) - can change to 'en-US' for English
             
-            recognition.onresult = (event) => {
+            recognition.onresult = async (event) => {
                 let interimTranscript = '';
                 let finalTranscript = '';
                 
@@ -285,7 +337,17 @@
                 }
                 
                 if (finalTranscript) {
-                    transcribedText.textContent = finalTranscript.trim();
+                    const textWithoutTajweed = finalTranscript.trim();
+                    // Store original text for comparison
+                    transcribedText.setAttribute('data-original', textWithoutTajweed);
+                    // Add tajweed via backend API
+                    try {
+                        const tajweedText = await addTajweedToText(textWithoutTajweed);
+                        transcribedText.textContent = tajweedText || textWithoutTajweed;
+                    } catch (err) {
+                        console.error('Tajweed error:', err);
+                        transcribedText.textContent = textWithoutTajweed;
+                    }
                     compareButton.style.display = 'block';
                 } else if (interimTranscript) {
                     transcribedText.textContent = interimTranscript + ' (listening...)';
@@ -324,6 +386,8 @@
         const compareButton = document.getElementById('compareButton');
         const transcribedText = document.getElementById('transcribedText');
         const verseText = document.getElementById('verseText');
+        const verseDropdown = document.getElementById('verseDropdown');
+        const verseReference = document.getElementById('verseReference');
         const loading = document.getElementById('loading');
         const result = document.getElementById('result');
         const error = document.getElementById('error');
@@ -333,6 +397,34 @@
                 await startRecording();
             } else {
                 stopRecording();
+            }
+        });
+
+        // Handle verse dropdown selection
+        verseDropdown.addEventListener('change', (e) => {
+            const selectedOption = e.target.options[e.target.selectedIndex];
+            const verseTextValue = selectedOption.getAttribute('data-text');
+            const verseValue = selectedOption.value;
+            
+            if (verseValue === 'custom') {
+                verseText.value = '';
+                verseText.placeholder = 'Enter custom verse text...';
+                verseReference.textContent = '';
+                verseText.focus();
+            } else if (verseTextValue) {
+                verseText.value = verseTextValue;
+                verseReference.textContent = `Verse: ${selectedOption.text}`;
+                // Auto-compare if we have transcribed text
+                if (transcribedText.textContent && 
+                    transcribedText.textContent !== 'Record your recitation to get started' &&
+                    transcribedText.textContent !== 'Recording...' &&
+                    transcribedText.textContent !== 'Processing...' &&
+                    transcribedText.textContent !== 'Listening... Speak now') {
+                    compareVerse();
+                }
+            } else {
+                verseText.value = '';
+                verseReference.textContent = '';
             }
         });
 
@@ -459,12 +551,44 @@
                 
                 // Only update if we got valid text
                 if (data.text && data.text.trim()) {
-                    transcribedText.textContent = data.text;
+                    // Display text with tajweed (diacritics)
+                    // The backend should already have tajweed applied
+                    let textToDisplay = data.text;
+                    let originalText = data.original_text || data.text;
+                    
+                    // If backend didn't add tajweed, try adding it via frontend API call
+                    if (!data.original_text && data.text) {
+                        // Check if text has diacritics (simple check)
+                        const hasDiacritics = /[ًٌٍَُِّْٰ]/.test(data.text);
+                        if (!hasDiacritics) {
+                            // Text doesn't have tajweed, add it
+                            try {
+                                const tajweedResponse = await fetch(`${API_BASE_URL}/add_tajweed`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ text: data.text })
+                                });
+                                if (tajweedResponse.ok) {
+                                    const tajweedData = await tajweedResponse.json();
+                                    textToDisplay = tajweedData.text_with_tajweed || data.text;
+                                    originalText = tajweedData.original_text || data.text;
+                                }
+                            } catch (err) {
+                                console.error('Failed to add tajweed:', err);
+                            }
+                        }
+                    }
+                    
+                    transcribedText.textContent = textToDisplay;
+                    transcribedText.setAttribute('data-original', originalText);
                     loading.style.display = 'none';
                     compareButton.style.display = 'block';
 
-                    // Auto-compare if verse text exists
-                    if (verseText.value.trim()) {
+                    // Auto-compare if verse is selected from dropdown
+                    if (verseDropdown.value && verseDropdown.value !== '' && verseDropdown.value !== 'custom' && verseText.value.trim()) {
+                        await compareVerse();
+                    } else if (verseText.value.trim()) {
+                        // Also compare if verse text was manually entered
                         await compareVerse();
                     }
                 } else {
@@ -480,19 +604,50 @@
             }
         }
 
+        // Function to add tajweed to text via backend
+        async function addTajweedToText(text) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/add_tajweed`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ text: text })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    return data.text_with_tajweed || text;
+                }
+            } catch (err) {
+                console.error('Failed to add tajweed:', err);
+            }
+            return text; // Return original if tajweed fails
+        }
+
         compareButton.addEventListener('click', compareVerse);
 
         async function compareVerse() {
-            const recognizedText = transcribedText.textContent.trim();
+            // Use original text for comparison if available (without tajweed)
+            // This gives better matching results
+            let recognizedText = transcribedText.getAttribute('data-original') || transcribedText.textContent.trim();
+            recognizedText = recognizedText.trim();
+            
+            // Remove diacritics from verse text for comparison (backend handles this, but we can also do it here)
             const verse = verseText.value.trim();
+            const verseRef = verseDropdown.value && verseDropdown.value !== 'custom' 
+                ? verseDropdown.options[verseDropdown.selectedIndex].text 
+                : 'Custom';
 
-            if (!recognizedText || recognizedText === 'Record your recitation to get started' || recognizedText === 'Processing...') {
+            if (!recognizedText || recognizedText === 'Record your recitation to get started' || 
+                recognizedText === 'Processing...' || recognizedText === 'Recording...' ||
+                recognizedText === 'Listening... Speak now') {
                 showError('Please record audio first');
                 return;
             }
 
             if (!verse) {
-                showError('Please enter verse text');
+                showError('Please select a verse from dropdown or enter verse text');
                 return;
             }
 
@@ -509,7 +664,7 @@
                     body: JSON.stringify({
                         recognized_text: recognizedText,
                         verse_text: verse,
-                        verse_reference: '1:1'
+                        verse_reference: verseRef
                     })
                 });
 
@@ -526,7 +681,7 @@
             }
         }
 
-        function displayComparisonResult(data) {
+        async function displayComparisonResult(data) {
             loading.style.display = 'none';
             result.style.display = 'block';
 
@@ -550,10 +705,36 @@
             `;
 
             const wordComparison = document.getElementById('wordComparison');
-            wordComparison.innerHTML = data.word_comparisons.map(item => {
-                const wordClass = item.match ? 'word-match' : 'word-mismatch';
-                return `<span class="word ${wordClass}">${item.recognized || item.verse || '—'}</span>`;
-            }).join('');
+            
+            // Add tajweed to recognized words for display
+            const wordsWithTajweed = await Promise.all(
+                data.word_comparisons.map(async (item) => {
+                    let recognizedWord = item.recognized || '';
+                    let verseWord = item.verse || '';
+                    
+                    // Add tajweed to recognized word if it doesn't have it
+                    if (recognizedWord && !/[ًٌٍَُِّْٰ]/.test(recognizedWord)) {
+                        try {
+                            const tajweedResponse = await fetch(`${API_BASE_URL}/add_tajweed`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ text: recognizedWord })
+                            });
+                            if (tajweedResponse.ok) {
+                                const tajweedData = await tajweedResponse.json();
+                                recognizedWord = tajweedData.text_with_tajweed || recognizedWord;
+                            }
+                        } catch (err) {
+                            // Use original if tajweed fails
+                        }
+                    }
+                    
+                    const wordClass = item.match ? 'word-match' : 'word-mismatch';
+                    return `<span class="word ${wordClass}">${recognizedWord || verseWord || '—'}</span>`;
+                })
+            );
+            
+            wordComparison.innerHTML = wordsWithTajweed.join('');
         }
 
         function showError(message) {
