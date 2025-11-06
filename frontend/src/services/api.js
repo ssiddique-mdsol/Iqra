@@ -1,8 +1,12 @@
 import axios from 'axios';
-import { API_BASE_URL } from '@env';
+import Constants from 'expo-constants';
+
+// Get API URL from environment or use default
+// For mobile, you may need to use your Mac's IP address instead of localhost
+const API_BASE_URL = Constants.expoConfig?.extra?.apiUrl || 'http://localhost:8000';
 
 const apiClient = axios.create({
-  baseURL: API_BASE_URL || 'http://localhost:8000',
+  baseURL: API_BASE_URL,
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
