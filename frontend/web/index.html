@@ -584,12 +584,20 @@
                     loading.style.display = 'none';
                     compareButton.style.display = 'block';
 
-                    // Auto-compare if verse is selected from dropdown
-                    if (verseDropdown.value && verseDropdown.value !== '' && verseDropdown.value !== 'custom' && verseText.value.trim()) {
+                    // Auto-compare if verse is selected from dropdown OR if verse text exists
+                    const hasVerseSelected = verseDropdown.value && verseDropdown.value !== '' && verseDropdown.value !== 'custom';
+                    const hasVerseText = verseText.value.trim();
+                    
+                    console.log('Auto-comparing:', { hasVerseSelected, hasVerseText, verseText: verseText.value });
+                    
+                    if (hasVerseSelected && hasVerseText) {
+                        console.log('Auto-comparing with selected verse...');
                         await compareVerse();
-                    } else if (verseText.value.trim()) {
-                        // Also compare if verse text was manually entered
+                    } else if (hasVerseText) {
+                        console.log('Auto-comparing with manual verse text...');
                         await compareVerse();
+                    } else {
+                        console.log('No verse selected, showing compare button only');
                     }
                 } else {
                     transcribedText.textContent = 'No text recognized';

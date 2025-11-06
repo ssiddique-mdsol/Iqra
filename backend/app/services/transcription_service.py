@@ -1,5 +1,9 @@
 import os
 from typing import Dict
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Try to import whisper, but make it optional
 try:
@@ -19,23 +23,46 @@ class TranscriptionService:
     """
     
     def __init__(self):
-        self.use_whisper = os.getenv("USE_WHISPER", "false").lower() == "true"
+        # HARDCODED FOR TESTING - force Whisper to be used
+        self.use_whisper = True  # HARDCODED: os.getenv("USE_WHISPER", "false").lower() == "true"
         self.add_tajweed = os.getenv("ADD_TAJWEED", "true").lower() == "true"
+        print(f"[TranscriptionService.__init__] HARDCODED use_whisper=True")
         self.model = None
         self.tajweed_service = TajweedService()
         
         if self.use_whisper and WHISPER_AVAILABLE:
             try:
-                # Load Whisper model - using "small" for better Arabic accuracy
+                # Load Whisper model - using "small" for better balance
                 # Options: tiny, base, small, medium, large
-                # "small" is a good balance of accuracy and speed
-                print("[Whisper] Loading Whisper model: small")
-                self.model = whisper.load_model("small")
-                print("[Whisper] Model loaded successfully")
+                # Start with "small" - can upgrade to "medium" later if needed
+                model_name = os.getenv("WHISPER_MODEL", "small")  # Allow override via env
+                print(f"[Whisper] ========================================")
+                print(f"[Whisper] Attempting to load Whisper model: {model_name}")
+                print(f"[Whisper] USE_WHISPER env: {os.getenv('USE_WHISPER', 'NOT SET')}")
+                try:
+                    self.model = whisper.load_model(model_name)
+                    print(f"[Whisper] ✅ Model '{model_name}' loaded successfully!")
+                    print(f"[Whisper] ========================================")
+                except Exception as load_error:
+                    print(f"[Whisper] ❌ ERROR loading model '{model_name}': {load_error}")
+                    print(f"[Whisper] Trying 'small' model as fallback...")
+                    try:
+                        self.model = whisper.load_model("small")
+                        print(f"[Whisper] ✅ Fallback to 'small' model successful!")
+                        print(f"[Whisper] ========================================")
+                    except Exception as fallback_error:
+                        print(f"[Whisper] ❌ Fallback also failed: {fallback_error}")
+                        print(f"[Whisper] Falling back to mock transcription")
+                        print(f"[Whisper] ========================================")
+                        raise load_error
             except Exception as e:
-                print(f"Warning: Could not load Whisper model: {e}")
-                print("Falling back to mock transcription")
+                print(f"[Whisper] ❌ CRITICAL: Could not load Whisper model: {e}")
+                print(f"[Whisper] Error type: {type(e).__name__}")
+                import traceback
+                traceback.print_exc()
+                print("[Whisper] Falling back to mock transcription")
                 self.use_whisper = False
+                self.model = None
         elif self.use_whisper and not WHISPER_AVAILABLE:
             print("Warning: Whisper is not available (not installed or incompatible)")
             print("Falling back to mock transcription")
@@ -52,10 +79,19 @@ class TranscriptionService:
         Returns:
             Dict with 'text' and optional 'confidence'
         """
+        print(f"[TranscriptionService] ========================================")
+        print(f"[TranscriptionService] use_whisper={self.use_whisper}, model={self.model is not None}")
         if self.use_whisper and self.model:
+            print("[TranscriptionService] ✅ Using Whisper for transcription")
             result = await self._transcribe_with_whisper(audio_bytes, filename)
         else:
+            print("[TranscriptionService] ⚠️  Using MOCK transcription (Whisper not available)")
+            if not self.use_whisper:
+                print("[TranscriptionService] Reason: use_whisper is False")
+            if not self.model:
+                print("[TranscriptionService] Reason: model is None")
             result = await self._transcribe_mock(audio_bytes, filename)
+        print(f"[TranscriptionService] ========================================")
         
         # Add tajweed if enabled
         if self.add_tajweed and result.get("text"):
@@ -70,7 +106,7 @@ class TranscriptionService:
         """Transcribe using OpenAI Whisper."""
         import tempfile
         
-        # Determine file extension from filename or default to .wav
+        # Determine file extension from filename or content
         file_ext = ".wav"
         if filename:
             if filename.endswith('.m4a'):
@@ -80,10 +116,26 @@ class TranscriptionService:
             elif filename.endswith('.wav'):
                 file_ext = ".wav"
         
+        # If no extension, try to detect from content
+        if not filename or '.' not in filename:
+            # Check for common audio file signatures
+            if audio_bytes[:4] == b'ftyp' or (len(audio_bytes) > 4 and audio_bytes[4:8] == b'ftyp'):
+                file_ext = ".m4a"  # MP4/M4A container
+                print(f"[Whisper] Detected M4A format from content")
+            elif audio_bytes[:4] == b'RIFF':
+                file_ext = ".wav"
+                print(f"[Whisper] Detected WAV format from content")
+            elif audio_bytes[:3] == b'ID3' or (len(audio_bytes) > 1 and audio_bytes[:2] == b'\xff\xfb'):
+                file_ext = ".mp3"
+                print(f"[Whisper] Detected MP3 format from content")
+        
+        print(f"[Whisper] Using file extension: {file_ext}")
+        
         # Save audio bytes to temporary file with correct extension
         with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_file:
             tmp_file.write(audio_bytes)
             tmp_path = tmp_file.name
+            print(f"[Whisper] Wrote {len(audio_bytes)} bytes to {tmp_path}")
         
         try:
             print(f"[Whisper] ========================================")
@@ -97,13 +149,20 @@ class TranscriptionService:
             # Use language="ar" for Arabic
             # Use fp16=False for better compatibility
             # Use initial_prompt to help with Arabic recognition
+            # Use temperature=0 for more deterministic results
+            # Use beam_size=5 for better accuracy (default is 5)
+            # Use condition_on_previous_text=True for better context
             result = self.model.transcribe(
                 tmp_path, 
                 language="ar",  # Arabic language
                 task="transcribe",  # Transcribe, not translate
                 fp16=False,  # Use float32 for better compatibility
                 verbose=True,  # More verbose for debugging
-                initial_prompt="بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ"  # Help Whisper recognize Arabic
+                temperature=0.0,  # More deterministic (less random)
+                beam_size=5,  # Beam search for better accuracy
+                best_of=5,  # Try multiple decodings, pick best
+                condition_on_previous_text=True,  # Use previous text for context
+                initial_prompt="بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ الرَّحْمَٰنِ الرَّحِيمِ مَالِكِ يَوْمِ الدِّينِ"  # Longer prompt with more Arabic context
             )
             transcribed_text = result["text"].strip()
             

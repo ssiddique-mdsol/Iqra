@@ -9,6 +9,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { Audio } from 'expo-av';
+import Constants from 'expo-constants';
 import { transcriptionAPI } from '../services/api';
 
 export default function HomeScreen({ navigation }) {
@@ -19,49 +20,61 @@ export default function HomeScreen({ navigation }) {
 
   async function startRecording() {
     try {
+      console.log('[Mobile] Requesting audio permissions...');
       const permission = await Audio.requestPermissionsAsync();
+      console.log('[Mobile] Permission status:', permission.status);
+      
       if (permission.status !== 'granted') {
         Alert.alert('Permission Required', 'Please grant microphone permission');
         return;
       }
 
+      console.log('[Mobile] Setting audio mode...');
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
       });
 
+      console.log('[Mobile] Creating recording with optimized settings...');
       // Use optimized recording settings for Arabic speech recognition
-      const { recording: newRecording } = await Audio.Recording.createAsync({
+      // Simplified settings that work across all platforms
+      const recordingOptions = {
         android: {
           extension: '.m4a',
           outputFormat: Audio.AndroidOutputFormat.MPEG_4,
           audioEncoder: Audio.AndroidAudioEncoder.AAC,
-          sampleRate: 44100,
-          numberOfChannels: 2,
-          bitRate: 128000,
+          sampleRate: 16000,
+          numberOfChannels: 1,
+          bitRate: 64000,
         },
         ios: {
           extension: '.m4a',
           outputFormat: Audio.IOSOutputFormat.MPEG4AAC,
           audioQuality: Audio.IOSAudioQuality.HIGH,
-          sampleRate: 44100,
-          numberOfChannels: 2,
-          bitRate: 128000,
-          linearPCMBitDepth: 16,
-          linearPCMIsBigEndian: false,
-          linearPCMIsFloat: false,
+          sampleRate: 16000,
+          numberOfChannels: 1,
+          // Note: bitRate is not valid for iOS MPEG4AAC format
         },
         web: {
           mimeType: 'audio/webm',
-          bitsPerSecond: 128000,
+          bitsPerSecond: 64000,
         },
-      });
+      };
       
+      console.log('[Mobile] Recording options:', JSON.stringify(recordingOptions, null, 2));
+      const { recording: newRecording } = await Audio.Recording.createAsync(recordingOptions);
+      
+      console.log('[Mobile] ✅ Recording started successfully');
       setRecording(newRecording);
       setIsRecording(true);
     } catch (err) {
-      console.error('Failed to start recording', err);
-      Alert.alert('Error', 'Failed to start recording');
+      console.error('[Mobile] ❌ Failed to start recording:', err);
+      console.error('[Mobile] Error details:', JSON.stringify(err, null, 2));
+      Alert.alert(
+        'Recording Error', 
+        `Failed to start recording: ${err.message || 'Unknown error'}\n\nCheck console for details.`
+      );
     }
   }
 
@@ -86,14 +99,31 @@ export default function HomeScreen({ navigation }) {
   async function transcribeAudio(uri) {
     setIsTranscribing(true);
     try {
+      console.log('[Mobile] Starting transcription for:', uri);
+      
+      // For React Native, FormData needs special handling
       const formData = new FormData();
+      
+      // React Native FormData format - must use this exact structure
       formData.append('audio_file', {
-        uri,
+        uri: uri,
         type: 'audio/m4a',
-        name: 'recording.m4a',
+        name: `recording_${Date.now()}.m4a`,
       });
 
+      console.log('[Mobile] FormData created, sending to backend...');
+      console.log('[Mobile] API URL:', Constants.expoConfig?.extra?.apiUrl || 'http://localhost:8000');
+      
       const result = await transcriptionAPI.transcribeAudio(formData);
+      
+      console.log('[Mobile] ✅ Transcription result:', result);
+      console.log('[Mobile] ✅ Transcribed text:', result.text);
+      
+      if (!result.text || result.text.trim().length === 0) {
+        console.warn('[Mobile] ⚠️  Warning: Transcription result is empty!');
+        Alert.alert('Warning', 'Transcription returned empty text. Please try recording again.');
+      }
+      
       setTranscribedText(result.text);
 
       // Navigate to comparison screen if text is available

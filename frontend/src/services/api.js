@@ -21,11 +21,14 @@ export const transcriptionAPI = {
    */
   transcribeAudio: async (formData) => {
     try {
+      console.log('[API] Sending transcription request...');
       const response = await apiClient.post('/transcribe_audio', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        timeout: 60000, // 60 seconds timeout for Whisper
       });
+      console.log('[API] Response received:', response.data);
       return response.data;
     } catch (error) {
       console.error('Transcription error:', error);
